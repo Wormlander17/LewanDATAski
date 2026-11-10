@@ -8,7 +8,7 @@ ball (D).
 is visible, two small self supervised models (trained only on labels made by our own code) to fill
 the gaps where the ball is lost, and a Viterbi decoder that turns it all into clean possession spells.
 
-* Full method, rules, assets, limitations: **[TECHNICAL_DOCUMENT.md](TECHNICAL_DOCUMENT.md)**
+* Full method, rules, assets, limitations: **[LewanDATAski.md](LewanDATAski.md)**
 * Code: **[possession/](possession/)** (step by step notes in [possession/README.md](possession/README.md))
 * No hand labels of any kind, and no match data in this repository.
 
@@ -38,7 +38,7 @@ the gaps where the ball is lost, and a Viterbi decoder that turns it all into cl
 | Path | What |
 | --- | --- |
 | `possession/` | Our method |
-| `TECHNICAL_DOCUMENT.md` | The technical document |
+| `LewanDATAski.md` | The technical document |
 | `tools/check_before_push.py` | Safety check run before every upload: no match data may be published |
 | `games.py`, `evaluation/`, `starter/`, `*.md` | The organisers' starter kit, unchanged (MIT, see [LICENSE](LICENSE)); their original README is [CHALLENGE_README.md](CHALLENGE_README.md) |
 
