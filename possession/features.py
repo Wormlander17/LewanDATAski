@@ -185,46 +185,83 @@ def kickoff_frames(tags, ball):
     return out
 
 
-def stoppages(ball, out, still, seen, ball_speed, min_out=8, max_back=15 * FPS):
+def stoppages(ball, out, still, seen, ball_speed, min_out=8, max_back=15 * FPS,
+              kick_speed=4.0, kick_frames=3, max_hole=FPS, max_wait=60 * FPS,
+              tempo=None, live_tempo=2.2, grace=10 * FPS):
     """Stoppages we can SEE: [start, end) spans where the ball is surely dead.
 
-    * Ball out of the pitch for at least `min_out` frames. Dead from the first out frame, and it
-      stays dead while the ball, back in view, is still lying or rolling slowly (being placed).
+    * Ball out of the pitch for at least `min_out` frames. Dead from the first out frame.
     * Ball lying still for 2 s (placed for a free kick, goal kick, corner, kickoff). Dead back to
-      when the ball was last moving fast (the foul or the ball going out), at most 15 s back.
+      when the ball was last moving (the foul or the ball going out), at most 15 s back.
 
-    A stoppage ends at the restart: the first frame the ball is moving again.
+    A stoppage lasts until the RESTART: a clear kick or throw (ball faster than `kick_speed` m/s
+    for `kick_frames` frames in a row), never taken from behind a goal line. A keeper walking
+    with the ball, or the ball being rolled back onto the pitch over the goal line, is not a
+    restart. If the tracker loses
+    the ball for more than `max_hole` frames, the visible stoppage stops there (the bridge below
+    and the dead ball model take over). Safety brake: if `tempo` (players' mean speed, 2 s
+    average) is given, a stoppage also ends once players move at live play pace (`live_tempo`), after a `grace`
+    period at its start while players slow down.
     Returns a boolean mask and the list of restart frames.
     """
     n = len(ball)
     dead = np.zeros(n, dtype=bool)
     restarts = []
-    slow = seen & (np.nan_to_num(ball_speed, nan=0.0) < 2.0)
+    v = np.nan_to_num(ball_speed, nan=0.0)
+    slow = seen & (v < 2.0)
+    fast = seen & (v > kick_speed)
+    # A restart is the START of a clear kick or throw (fast for `kick_frames` frames in a row,
+    # so jitter while a keeper walks with the ball does not count), never taken from behind a
+    # goal line (only throw ins come from outside, over a touchline).
+    L, _ = PITCH
+    kicked = np.zeros(n, dtype=bool)
+    edges = np.diff(np.r_[0, fast.astype(np.int8), 0])
+    for r, r_end in zip(np.flatnonzero(edges == 1), np.flatnonzero(edges == -1)):
+        if r_end - r < kick_frames or r < 10:
+            continue
+        x = ball[r, 0]
+        behind_goal_line = x < -0.5 or x > L + 0.5
+        if not behind_goal_line:
+            kicked[r] = True
 
     def runs(mask):
         d = np.diff(np.r_[0, mask.astype(np.int8), 0])
         return zip(np.flatnonzero(d == 1), np.flatnonzero(d == -1))
 
+    busy = np.zeros(n, dtype=bool) if tempo is None else np.nan_to_num(tempo) > live_tempo
+
+    def until_restart(e, origin):
+        """From frame e, walk forward to the restart. Returns (end, restarted)."""
+        start, hole = e, 0
+        while e < n and e - start < max_wait:
+            if kicked[e] and not out[e]:
+                return e, True
+            if busy[e] and e - origin > grace:      # players need a few seconds to slow down
+                return e, False
+            hole = hole + 1 if not seen[e] else 0
+            if hole > max_hole:
+                return e - hole + 1, False
+            e += 1
+        return e, False
+
     for a, b in runs(out):
         if b - a < min_out:
             continue
-        e = b
-        while e < n and (out[e] or slow[e]):
-            e += 1
+        e, ok = until_restart(b, a)
         dead[a:e] = True
-        if e < n and seen[e]:
+        if ok:
             restarts.append(e)
 
     for a, b in runs(still):
         s = a
         while s > max(0, a - max_back) and slow[s - 1] and not out[s - 1]:
             s -= 1
-        e = b
-        while e < n and slow[e]:
-            e += 1
+        e, ok = until_restart(b, s)
         dead[s:e] = True
-        if e < n and seen[e]:
+        if ok:
             restarts.append(e)
+
+    restarts = [r for r in restarts if not dead[r]]   # a restart inside another stoppage is not one
 
     # Bridge: dead just before the tracker lost the ball, and when it finds the ball again it is
     # lying still or being placed -> nothing restarted in between, so the gap is dead too.
@@ -437,10 +474,11 @@ def ball_play(ball, players, out, still, window=2 * FPS):
 
     line = np.minimum.reduce([ball[:, 0], L - ball[:, 0], ball[:, 1], W - ball[:, 1]])
     fast = np.where(np.isnan(v), np.nan, (v > 8.0).astype(float))
+    # No "ball out" or "ball still" inputs on purpose: those define the stoppages the model is
+    # taught with, so they would be a shortcut. The decoder already uses them directly.
     feats = np.column_stack([
         v, rolling_mean(v, window), vmax, rolling_mean(fast, window), distinct,
-        rolling_mean(line, window), rolling_mean(out.astype(float), window),
-        rolling_mean(still.astype(float), window),
+        rolling_mean(line, window),
     ])
     feats[~any_seen] = np.nan
     return feats.astype(np.float32), any_seen

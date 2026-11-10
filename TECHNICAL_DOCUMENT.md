@@ -1,6 +1,6 @@
 # Who has the ball? Possession from tracking with a self supervised Viterbi decoder
 
-**Team:** `LewanDATAski` · **Members:** `<names>` · More Than a Hack 2027, Phase 1
+**Team:** `LewanDATAski` · **Members:** Girijesh Kumar Paramasivam Rajakumar, Mohanraam Vasanthi Krishna, Mithun Ganapathy Vallinayagam · More Than a Hack 2027, Phase 1
 
 Code: `possession/` in this repository. Submission: `evaluation/results/LewanDATAski.csv`.
 
