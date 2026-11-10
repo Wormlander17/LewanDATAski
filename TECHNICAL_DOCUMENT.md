@@ -1,8 +1,8 @@
 # Who has the ball? Possession from tracking with a self supervised Viterbi decoder
 
-**Team:** `<team_name>` · **Members:** `<names>` · More Than a Hack 2027, Phase 1
+**Team:** `LewanDATAski` · **Members:** `<names>` · More Than a Hack 2027, Phase 1
 
-Code: `possession/` in this repository. Submission: `evaluation/results/<team_name>.csv`.
+Code: `possession/` in this repository. Submission: `evaluation/results/LewanDATAski.csv`.
 
 ---
 
@@ -168,8 +168,8 @@ pip install -r requirements-possession.txt
 export MTAH_DATA_DIR=/path/to/data            # macOS / Linux
 $env:MTAH_DATA_DIR = "C:\path\to\data"        # Windows PowerShell
 
-python -m possession.run --fresh --name <team_name>
-python evaluation/validate_submission.py evaluation/results/<team_name>.csv
+python -m possession.run --fresh --name LewanDATAski
+python evaluation/validate_submission.py evaluation/results/LewanDATAski.csv
 ```
 
 A fresh run takes about 2 minutes (longer on a slow laptop), then caches its evidence in `data/` (rerun with `--fresh` to rebuild). Two fresh runs give a byte identical file. All settings are in `PARAMS` at the top of `possession/run.py`. The match data is not in this repository.

@@ -70,7 +70,8 @@ def build_evidence(verbose=True, use_cache=True):
 
     ctrl, _, _ = F.ball_control(ball, players, teams)
     out, still, seen, ball_speed = F.ball_state(ball)
-    stopped, restart_frames = F.stoppages(ball, out, still, seen, ball_speed)
+    tempo_2s = F.rolling_mean(np.nanmean(F.player_speed(players), 1), F.FPS)
+    stopped, restart_frames = F.stoppages(ball, out, still, seen, ball_speed, tempo=tempo_2s)
     restart = np.zeros(n, dtype=bool)
     for r in restart_frames:
         restart[r:r + F.FPS] = True          # the second after a restart is live play
@@ -103,7 +104,14 @@ def build_evidence(verbose=True, use_cache=True):
     Xb, ball_near = F.ball_play(ball, players, out, still)
     yb = np.where(ball_near, dead_y, -1).astype(np.int8)
     p_dead_ball = out_of_fold(np.column_stack([tempo, Xb]), yb, balance(yb))
-    p_dead = np.where(ball_near & ~np.isnan(p_dead_ball), p_dead_ball, p_dead)
+    p_dead_tempo = p_dead
+    # Where both models have a view they count equally (average log odds). When they disagree,
+    # e.g. everyone walking while one player has the ball (a keeper holding it after a save, or
+    # a player waiting to take a free kick), neither can be checked, so the decoder decides from
+    # what happens around those frames.
+    both = ball_near & ~np.isnan(p_dead_ball)
+    mixed = 0.5 * logit(p_dead_tempo, 9.0) + 0.5 * logit(np.nan_to_num(p_dead_ball, nan=0.5), 9.0)
+    p_dead = np.where(both, 1.0 / (1.0 + np.exp(-mixed)), p_dead_tempo)
 
     if verbose:
         g = F.half_of(n) > 0
@@ -122,6 +130,7 @@ def build_evidence(verbose=True, use_cache=True):
         "stopped": stopped, "restart": restart,
         "taker_visible": taker_visible, "taker_hidden": taker_hidden,
         "p_home": p_home, "p_dead": p_dead,
+        "p_dead_tempo": p_dead_tempo, "p_dead_ball": p_dead_ball, "ball_near": ball_near,
     }
     np.savez_compressed(EVIDENCE_CACHE, **ev)
     return ev
@@ -180,7 +189,7 @@ def write(path, labels):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--name", default="barcathon_gk")
+    ap.add_argument("--name", default="LewanDATAski")
     ap.add_argument("--out", default=os.path.join(ROOT, "evaluation", "results"))
     ap.add_argument("--fresh", action="store_true", help="rebuild evidence, ignore the cache")
     args = ap.parse_args()

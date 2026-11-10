@@ -10,6 +10,7 @@ The match data is licensed for this competition only. Publishing it breaks the t
 Never upload by dragging files onto the GitHub website: that ignores .gitignore completely.
 """
 
+import fnmatch
 import os
 import subprocess
 import sys
@@ -26,6 +27,8 @@ ALLOWED_DATA = {"data/README.md"}
 
 
 def files_git_would_publish():
+    if "--no-git" in sys.argv:
+        return None
     try:
         out = subprocess.run(
             ["git", "ls-files", "--cached", "--others", "--exclude-standard"],
@@ -35,12 +38,63 @@ def files_git_would_publish():
     return [line.strip() for line in out.splitlines() if line.strip()]
 
 
+def read_ignore_rules():
+    """The patterns in .gitignore as (negated, directory_only, anchored, pattern)."""
+    rules = []
+    path = os.path.join(ROOT, ".gitignore")
+    if not os.path.exists(path):
+        return rules
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.rstrip("\n").rstrip()
+            if not line or line.startswith("#"):
+                continue
+            neg = line.startswith("!")
+            if neg:
+                line = line[1:]
+            dir_only = line.endswith("/")
+            line = line.rstrip("/")
+            anchored = "/" in line
+            rules.append((neg, dir_only, anchored, line.lstrip("/")))
+    return rules
+
+
+def _match(rule, rel, is_dir):
+    _, dir_only, anchored, pat = rule
+    if dir_only and not is_dir:
+        return False
+    if anchored:
+        return fnmatch.fnmatchcase(rel, pat)
+    return fnmatch.fnmatchcase(rel.rsplit("/", 1)[-1], pat)
+
+
+def ignored(rules, rel, is_dir):
+    """Same idea as git: the last matching rule wins."""
+    result = False
+    for rule in rules:
+        if _match(rule, rel, is_dir):
+            result = not rule[0]
+    return result
+
+
 def all_files():
+    """Files git would publish, worked out from .gitignore without git (for GitHub Desktop)."""
+    rules = read_ignore_rules()
     out = []
     for folder, dirs, files in os.walk(ROOT):
-        dirs[:] = [d for d in dirs if d not in (".git", "__pycache__")]
+        rel_folder = os.path.relpath(folder, ROOT).replace(os.sep, "/")
+        rel_folder = "" if rel_folder == "." else rel_folder + "/"
+        keep = []
+        for d in dirs:
+            if d == ".git" or ignored(rules, rel_folder + d, True):
+                continue
+            keep.append(d)
+        dirs[:] = keep
         for name in files:
-            out.append(os.path.relpath(os.path.join(folder, name), ROOT).replace(os.sep, "/"))
+            rel = rel_folder + name
+            # a file inside an ignored folder is ignored too (git never looks inside it)
+            if not ignored(rules, rel, False):
+                out.append(rel)
     return out
 
 
@@ -82,9 +136,7 @@ def problems(path):
 def main():
     files = files_git_would_publish()
     if files is None:
-        print("git was not found, so this checks EVERY file in the folder (stricter than needed).")
-        print("With GitHub Desktop, open its menu Repository > Open in Command Prompt and run this")
-        print("script there, so it can see what git would actually publish.\n")
+        print("(git not found in this window, so the .gitignore rules are applied by this script)")
         files = all_files()
 
     bad = [(f, problems(f)) for f in files]

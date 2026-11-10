@@ -1,4 +1,4 @@
-# Who has the ball? Team `<team_name>`, More Than a Hack 2027
+# Who has the ball? Team `LewanDATAski`, More Than a Hack 2027
 
 Our entry to Phase 1 of [More Than a Hack 2027](https://github.com/metrica-sports/more-than-a-hack-2027):
 label every frame of Barcelona vs Athletic Club as home possession (H), away possession (A) or dead
@@ -27,8 +27,8 @@ the gaps where the ball is lost, and a Viterbi decoder that turns it all into cl
 
    ```bash
    pip install -r requirements-possession.txt
-   python -m possession.run --fresh --name <team_name>
-   python evaluation/validate_submission.py evaluation/results/<team_name>.csv
+   python -m possession.run --fresh --name LewanDATAski
+   python evaluation/validate_submission.py evaluation/results/LewanDATAski.csv
    ```
 
    About 2 minutes. Two fresh runs give a byte identical file.
