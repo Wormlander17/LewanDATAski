@@ -1,0 +1,7 @@
+# Exact versions used to produce the submission. Other versions may give a slightly different
+# file, because the two small models are gradient boosted trees.
+# Python 3.13
+numpy==2.5.3
+pandas==3.0.5
+scikit-learn==1.9.1
+scipy==1.18.1
